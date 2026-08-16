@@ -1,0 +1,629 @@
+openapi: 3.1.0
+info:
+  title: FMCG Multi-Agent System API
+  version: 0.1.0-draft.1
+  description: |
+    Draft REST contract for M1: Order Intake and Risk Validation.
+    The API accepts orders from an authenticated SFA sales representative,
+    evaluates fraud risk asynchronously, and exposes the latest order status.
+  contact:
+    name: FMCG Multi-Agent System Team
+
+servers:
+  - url: http://localhost:8000
+    description: Local development
+
+tags:
+  - name: Orders
+    description: Order intake and order-status retrieval for SFA sales representatives.
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/v1/orders:
+    get:
+      tags: [Orders]
+      operationId: listOrders
+      summary: List orders belonging to the authenticated sales representative
+      description: |
+        Returns only orders owned by the authenticated sales representative.
+        The default sort is created_at descending.
+      parameters:
+        - $ref: '#/components/parameters/OrderStatusQuery'
+        - $ref: '#/components/parameters/RetailerIdQuery'
+        - $ref: '#/components/parameters/PageQuery'
+        - $ref: '#/components/parameters/PageSizeQuery'
+      responses:
+        '200':
+          description: A page of orders owned by the authenticated sales representative.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderListResponse'
+              example:
+                items:
+                  - order_id: 046c8f66-1707-4455-b30e-8bd01b98da27
+                    client_order_id: SFA-HUNG-20260816-0001
+                    retailer_id: CO-LAN-001
+                    declared_total_amount_vnd: 150000
+                    status: PENDING_FRAUD_CHECK
+                    order_time: '2026-08-16T15:00:00Z'
+                    updated_at: '2026-08-16T15:00:02Z'
+                page: 1
+                page_size: 20
+                total_items: 1
+                total_pages: 1
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    post:
+      tags: [Orders]
+      operationId: createOrder
+      summary: Accept an order and begin asynchronous fraud evaluation
+      description: |
+        Persists a new order in PENDING_FRAUD_CHECK and emits a logical
+        order.created.v1 event for the internal fraud worker. The caller must
+        supply an Idempotency-Key for safe retries. A 202 response does not mean
+        that the order is approved.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKeyHeader'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrderCreateRequest'
+            example:
+              client_order_id: SFA-HUNG-20260816-0001
+              retailer_id: CO-LAN-001
+              order_time: '2026-08-16T22:00:00+07:00'
+              items:
+                - product_sku: SKU-NUOC-NGOT-001
+                  quantity: 10
+              declared_total_amount_vnd: 150000
+      responses:
+        '202':
+          description: Order has been persisted and is awaiting fraud evaluation.
+          headers:
+            Location:
+              description: Relative URI of the newly accepted order.
+              schema:
+                type: string
+                example: /api/v1/orders/046c8f66-1707-4455-b30e-8bd01b98da27
+            Idempotency-Replayed:
+              description: True when this response is a successful replay of an earlier request.
+              schema:
+                type: boolean
+                example: false
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderAcceptedResponse'
+              example:
+                order_id: 046c8f66-1707-4455-b30e-8bd01b98da27
+                client_order_id: SFA-HUNG-20260816-0001
+                status: PENDING_FRAUD_CHECK
+                created_at: '2026-08-16T15:00:02Z'
+                updated_at: '2026-08-16T15:00:02Z'
+                fraud_assessment: null
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/RetailerNotAssigned'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /api/v1/orders/{order_id}:
+    get:
+      tags: [Orders]
+      operationId: getOrder
+      summary: Get an order and its latest fraud assessment
+      description: |
+        Returns an order only when it belongs to the authenticated sales representative.
+        If the caller does not own the order, the service returns ORDER_NOT_FOUND.
+      parameters:
+        - $ref: '#/components/parameters/OrderIdPath'
+      responses:
+        '200':
+          description: Current order state and latest available fraud assessment.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderDetailResponse'
+              example:
+                order_id: 046c8f66-1707-4455-b30e-8bd01b98da27
+                client_order_id: SFA-HUNG-20260816-0001
+                sales_rep_id: HUNG-001
+                retailer_id: CO-LAN-001
+                order_time: '2026-08-16T15:00:00Z'
+                items:
+                  - product_sku: SKU-NUOC-NGOT-001
+                    quantity: 10
+                declared_total_amount_vnd: 150000
+                status: APPROVED
+                created_at: '2026-08-16T15:00:02Z'
+                updated_at: '2026-08-16T15:00:07Z'
+                fraud_assessment:
+                  risk_score: 15
+                  decision: APPROVED
+                  reason_codes:
+                    - MOCK_LOW_RISK
+                  evaluator_type: mock_rule_engine
+                  evaluator_version: m1-0.1
+                  assessed_at: '2026-08-16T15:00:07Z'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/OrderNotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+components:
+  parameters:
+    IdempotencyKeyHeader:
+      in: header
+      name: Idempotency-Key
+      required: true
+      description: A client-generated UUID that identifies one logical create-order submission.
+      schema:
+        type: string
+        format: uuid
+      example: 7fe0d16e-80f5-4b92-a5f9-dba0d5bc6754
+
+    OrderIdPath:
+      in: path
+      name: order_id
+      required: true
+      description: Server-generated order identifier.
+      schema:
+        type: string
+        format: uuid
+
+    OrderStatusQuery:
+      in: query
+      name: status
+      required: false
+      description: Filter the caller's orders by one current order status.
+      schema:
+        $ref: '#/components/schemas/OrderStatus'
+
+    RetailerIdQuery:
+      in: query
+      name: retailer_id
+      required: false
+      description: Filter the caller's orders by retailer identifier.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 100
+
+    PageQuery:
+      in: query
+      name: page
+      required: false
+      description: One-based page number.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    PageSizeQuery:
+      in: query
+      name: page_size
+      required: false
+      description: Maximum number of rows returned in one page.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  schemas:
+    OrderCreateRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - client_order_id
+        - retailer_id
+        - order_time
+        - items
+        - declared_total_amount_vnd
+      properties:
+        client_order_id:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Identifier assigned by the SFA client. Unique within the authenticated sales representative.
+          example: SFA-HUNG-20260816-0001
+        retailer_id:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Identifier of an active retailer assigned to the authenticated sales representative.
+          example: CO-LAN-001
+        order_time:
+          type: string
+          format: date-time
+          description: Time recorded by the SFA client, including an explicit timezone offset.
+          example: '2026-08-16T22:00:00+07:00'
+        items:
+          type: array
+          minItems: 1
+          description: Each product_sku must occur only once in the array.
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        declared_total_amount_vnd:
+          type: integer
+          minimum: 1
+          description: Positive VND amount declared by the SFA. It is not an authoritative price calculation in M1.
+          example: 150000
+
+    OrderItem:
+      type: object
+      additionalProperties: false
+      required:
+        - product_sku
+        - quantity
+      properties:
+        product_sku:
+          type: string
+          minLength: 1
+          maxLength: 100
+          description: Active product SKU.
+          example: SKU-NUOC-NGOT-001
+        quantity:
+          type: integer
+          minimum: 1
+          example: 10
+
+    OrderStatus:
+      type: string
+      description: Current lifecycle state of an order in M1.
+      enum:
+        - PENDING_FRAUD_CHECK
+        - APPROVED
+        - REVIEW_REQUIRED
+        - REJECTED
+
+    FraudDecision:
+      type: string
+      description: Final decision emitted by the fraud evaluator.
+      enum:
+        - APPROVED
+        - REVIEW_REQUIRED
+        - REJECTED
+
+    FraudAssessmentSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - risk_score
+        - decision
+        - reason_codes
+        - evaluator_type
+        - evaluator_version
+        - assessed_at
+      properties:
+        risk_score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          example: 15
+        decision:
+          $ref: '#/components/schemas/FraudDecision'
+        reason_codes:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+            maxLength: 100
+          example:
+            - MOCK_LOW_RISK
+        evaluator_type:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: mock_rule_engine
+        evaluator_version:
+          type: string
+          minLength: 1
+          maxLength: 100
+          example: m1-0.1
+        assessed_at:
+          type: string
+          format: date-time
+          example: '2026-08-16T15:00:07Z'
+
+    OrderAcceptedResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - order_id
+        - client_order_id
+        - status
+        - created_at
+        - updated_at
+        - fraud_assessment
+      properties:
+        order_id:
+          type: string
+          format: uuid
+        client_order_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        fraud_assessment:
+          anyOf:
+            - $ref: '#/components/schemas/FraudAssessmentSummary'
+            - type: 'null'
+
+    OrderDetailResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - order_id
+        - client_order_id
+        - sales_rep_id
+        - retailer_id
+        - order_time
+        - items
+        - declared_total_amount_vnd
+        - status
+        - created_at
+        - updated_at
+        - fraud_assessment
+      properties:
+        order_id:
+          type: string
+          format: uuid
+        client_order_id:
+          type: string
+        sales_rep_id:
+          type: string
+          description: Sales representative ID derived from the authenticated identity at creation time.
+        retailer_id:
+          type: string
+        order_time:
+          type: string
+          format: date-time
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/OrderItem'
+        declared_total_amount_vnd:
+          type: integer
+          minimum: 1
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        fraud_assessment:
+          anyOf:
+            - $ref: '#/components/schemas/FraudAssessmentSummary'
+            - type: 'null'
+
+    OrderListItem:
+      type: object
+      additionalProperties: false
+      required:
+        - order_id
+        - client_order_id
+        - retailer_id
+        - declared_total_amount_vnd
+        - status
+        - order_time
+        - updated_at
+      properties:
+        order_id:
+          type: string
+          format: uuid
+        client_order_id:
+          type: string
+        retailer_id:
+          type: string
+        declared_total_amount_vnd:
+          type: integer
+          minimum: 1
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        order_time:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    OrderListResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+        - page
+        - page_size
+        - total_items
+        - total_pages
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrderListItem'
+        page:
+          type: integer
+          minimum: 1
+        page_size:
+          type: integer
+          minimum: 1
+          maximum: 100
+        total_items:
+          type: integer
+          minimum: 0
+        total_pages:
+          type: integer
+          minimum: 0
+
+    ErrorDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - field
+        - reason
+      properties:
+        field:
+          type: string
+          example: retailer_id
+        reason:
+          type: string
+          example: not_assigned
+
+    ErrorBody:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          example: RETAILER_NOT_ASSIGNED
+        message:
+          type: string
+          example: The retailer is not assigned to the authenticated sales representative.
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+        request_id:
+          type: string
+          description: Correlation identifier when one is available.
+          example: 01J0EXAMPLE
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+      properties:
+        error:
+          $ref: '#/components/schemas/ErrorBody'
+
+  responses:
+    Unauthenticated:
+      description: Authentication is missing, invalid, or expired.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: UNAUTHENTICATED
+              message: Authentication is required.
+              details: []
+              request_id: 01J0EXAMPLE
+
+    RetailerNotAssigned:
+      description: The authenticated sales representative is not assigned to the requested retailer.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: RETAILER_NOT_ASSIGNED
+              message: The retailer is not assigned to the authenticated sales representative.
+              details:
+                - field: retailer_id
+                  reason: not_assigned
+              request_id: 01J0EXAMPLE
+
+    OrderNotFound:
+      description: The order does not exist or is not visible to the caller.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: ORDER_NOT_FOUND
+              message: The requested order was not found.
+              details: []
+              request_id: 01J0EXAMPLE
+
+    Conflict:
+      description: An idempotency or client-order identifier conflict occurred.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            idempotencyKeyReused:
+              summary: The same idempotency key is used with a different payload.
+              value:
+                error:
+                  code: IDEMPOTENCY_KEY_REUSED
+                  message: The idempotency key was already used with a different request payload.
+                  details: []
+                  request_id: 01J0EXAMPLE
+            clientOrderIdConflict:
+              summary: The same client order ID is used with a different payload.
+              value:
+                error:
+                  code: CLIENT_ORDER_ID_CONFLICT
+                  message: The client order ID already exists with a different request payload.
+                  details: []
+                  request_id: 01J0EXAMPLE
+
+    ValidationError:
+      description: Request path, query, header, body, or input business validation failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: Request validation failed.
+              details:
+                - field: items[0].quantity
+                  reason: must_be_greater_than_zero
+              request_id: 01J0EXAMPLE
+
+    ServiceUnavailable:
+      description: A dependency needed to safely accept the order is unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: The service cannot accept orders at this time. Please retry.
+              details: []
+              request_id: 01J0EXAMPLE
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Draft assumption: the SFA gateway or identity provider issues a JWT.
+        The backend derives the sales representative identity from validated claims.
