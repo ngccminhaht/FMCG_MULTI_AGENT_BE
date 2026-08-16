@@ -7,15 +7,16 @@ Thư mục này là nguồn tham chiếu cho cách phân tích, thiết kế và
 1. [Quy trình phát triển end-to-end](01-end-to-end-delivery-process.md): vòng đời đầy đủ từ bài toán đến vận hành.
 2. [Workflow triển khai MVP](02-mvp-execution-workflow.md): việc cần làm ngay, phạm vi MVP và cách triển khai từng vertical slice.
 3. [Danh mục use case](03-use-case-catalog.md): actor, use case đề xuất, ưu tiên và loại giao diện cần thiết.
+4. [M1 domain rules và state machine](04-domain-rules-and-state-machine.md): rule, trạng thái, event logic, acceptance scenario và decision log cho MVP đầu tiên.
+5. [M1 API Contract](05-api-contract.md): bản contract dễ đọc cho FE, BE, QA và business review.
+6. [M1 OpenAPI Draft](openapi.yaml): đặc tả machine-readable tương ứng với API Contract.
 
-Các tài liệu sẽ được bổ sung khi dự án tiến tới từng mốc:
+Tài liệu dự kiến bổ sung khi M1 được baseline và đi vào implementation:
 
 ```text
-04-domain-rules-and-state-machine.md
-05-api-contract.md
-openapi.yaml
 06-data-model-and-erd.md
 07-test-strategy.md
+08-local-development-and-runbook.md
 ```
 
 ## Trạng thái source hiện tại
