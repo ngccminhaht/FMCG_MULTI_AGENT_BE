@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "name": "FMCG M1 Orders",
+    "slug": "fmcg-m1-orders",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light"
+  }
+}

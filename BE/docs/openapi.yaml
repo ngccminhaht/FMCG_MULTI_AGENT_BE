@@ -1,11 +1,12 @@
 openapi: 3.1.0
 info:
   title: FMCG Multi-Agent System API
-  version: 0.1.0-draft.1
+  version: 0.1.0
   description: |
-    Draft REST contract for M1: Order Intake and Risk Validation.
+    Baseline REST contract for the local M1: Order Intake and Risk Validation.
     The API accepts orders from an authenticated SFA sales representative,
     evaluates fraud risk asynchronously, and exposes the latest order status.
+    See 06-m1-local-baseline.md for the local dev identity and seed-data profile.
   contact:
     name: FMCG Multi-Agent System Team
 
@@ -58,6 +59,12 @@ paths:
           $ref: '#/components/responses/Unauthenticated'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '500':
+          description: An unexpected error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
     post:
       tags: [Orders]
@@ -117,6 +124,12 @@ paths:
           $ref: '#/components/responses/Conflict'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '500':
+          description: An unexpected error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 
@@ -164,6 +177,12 @@ paths:
           $ref: '#/components/responses/OrderNotFound'
         '422':
           $ref: '#/components/responses/ValidationError'
+        '500':
+          description: An unexpected error occurred.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
 components:
   parameters:
@@ -623,7 +642,7 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
-      bearerFormat: JWT
+      bearerFormat: opaque
       description: |
-        Draft assumption: the SFA gateway or identity provider issues a JWT.
-        The backend derives the sales representative identity from validated claims.
+        Local M1 baseline: send Bearer dev-hung-001. A production SFA/JWT
+        adapter will replace this local authentication mechanism later.

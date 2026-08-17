@@ -1,8 +1,9 @@
 # M1 — Domain rules, state machine và decision log
 
-**Trạng thái:** Draft — chưa được xem là contract baseline  
-**MVP:** Order Intake and Risk Validation  
+**Trạng thái:** Baseline cho local MVP; các quyết định production vẫn cần review
+**MVP:** Order Intake and Risk Validation
 **Phạm vi:** Sale gửi một đơn cho retailer hợp lệ; hệ thống lưu đơn bền vững, đánh giá risk bất đồng bộ bằng mock/rule engine và cho phép client đọc trạng thái.
+**Local decision profile:** [06-m1-local-baseline.md](06-m1-local-baseline.md) là quyết định có hiệu lực cho implementation demo/local.
 
 ## 1. Mục tiêu và ranh giới M1
 
@@ -180,9 +181,9 @@ Consumer phải idempotent vì event delivery có thể là **at least once**. C
 | AC-07 | Fraud evaluator lỗi hết retry | Order thành `REVIEW_REQUIRED`, có reason `FRAUD_EVALUATION_UNAVAILABLE`; không tự approve. |
 | AC-08 | Sale đọc order của sale khác | `404` để không lộ sự tồn tại của order ngoài quyền sở hữu. |
 
-## 8. Decision log
+## 8. Decision log cho production reopening
 
-Các mục dưới đây là **proposed/open**, không phải quyết định đã được business duyệt. Trước khi contract chuyển từ Draft sang Baseline, gán owner có tên và ngày chốt cho từng dòng `OPEN`.
+Các quyết định trong [06-m1-local-baseline.md](06-m1-local-baseline.md) đã đóng đủ blocker cho implementation local/demo. Bảng dưới đây giữ các câu hỏi cần mở lại trước production integration; chúng không chặn M1 local nhưng phải có owner và ngày chốt khi scope production bắt đầu.
 
 | ID | Quyết định/giả định | Trạng thái | Owner cần chốt | Tác động nếu đổi |
 |---|---|---|---|---|
@@ -197,9 +198,9 @@ Các mục dưới đây là **proposed/open**, không phải quyết định đ
 | D-M1-009 | Supervisor review action là M2; M1 chỉ thể hiện `REVIEW_REQUIRED`. | PROPOSED | Operations/Product | Terminal state behavior/UI copy. |
 | D-M1-010 | Retention, idempotency expiry và audit retention chưa chốt. | OPEN | Operations/Security | Database policy và compliance. |
 
-## 9. Delta với prototype hiện tại
+## 9. Delta với prototype tiền thân
 
-| Prototype hiện tại | Target M1 draft |
+| Prototype tiền thân | M1 local implementation |
 |---|---|
 | `sales_rep_id` do request body gửi | sales ID suy ra từ authenticated identity |
 | `total_amount` decimal | `declared_total_amount_vnd` integer VND |
@@ -208,4 +209,4 @@ Các mục dưới đây là **proposed/open**, không phải quyết định đ
 | In-memory store | PostgreSQL + migration + history + idempotency record |
 | Chỉ `POST /orders` | `POST /orders`, `GET /orders/{id}`, `GET /orders` |
 
-Không sửa code prototype theo tài liệu này cho tới khi decision log được review và API contract/OpenAPI được baseline.
+Implementation local hiện theo hướng target này. Bất kỳ thay đổi incompatible nào tiếp theo phải đi qua review domain rule, contract/OpenAPI, migration impact và UAT gate.

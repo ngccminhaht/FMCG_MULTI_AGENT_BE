@@ -1,8 +1,9 @@
 # M1 — API Contract: Order Intake and Risk Validation
 
-**Trạng thái:** Draft `0.1.0-draft.1`  
-**OpenAPI tương ứng:** [`openapi.yaml`](openapi.yaml)  
+**Trạng thái:** Baseline `0.1.0` cho local MVP; production integration cần review riêng
+**OpenAPI tương ứng:** [`openapi.yaml`](openapi.yaml)
 **Rule/state source:** [`04-domain-rules-and-state-machine.md`](04-domain-rules-and-state-machine.md)
+**Local implementation profile:** [`06-m1-local-baseline.md`](06-m1-local-baseline.md)
 
 ## 1. Mục đích và phạm vi
 
@@ -29,23 +30,28 @@ Fraud evaluator là luồng nội bộ: `POST /orders` tạo logical event `orde
 |---|---|
 | Base path | `/api/v1` |
 | Media type | `application/json` |
-| Auth | `Authorization: Bearer <JWT>`; backend lấy sales identity từ claim đã được xác thực. Cấu trúc/token issuer còn là decision open. |
+| Auth local | `Authorization: Bearer dev-hung-001`, opaque token map server-side sang `HUNG-001`. |
+| Auth production | `Authorization: Bearer <JWT>` qua SFA/identity adapter; issuer, audience và claim mapping chưa thuộc local baseline. |
 | Ownership | Sale chỉ xem/tạo order của chính mình; order ngoài quyền sở hữu trả `404`. |
 | Time | Timestamp dùng ISO 8601/RFC 3339 có timezone, ví dụ `2026-08-16T22:00:00+07:00`. Server lưu/so sánh thời gian chuẩn hóa UTC. |
 | Money | `declared_total_amount_vnd` là integer VND dương, không dùng float. Đây là amount do SFA khai báo, chưa phải giá authoritative. |
 | IDs | `order_id` là UUID server-generated; identifier từ SFA/retailer/SKU là string opaque. |
-| Request ID | Server nên trả `X-Request-Id`; mọi lỗi có `request_id` khi khả dụng. |
+| Request ID | Server trả `X-Request-Id`; mọi lỗi application-level có `request_id`. |
 | Extra fields | Request body không chấp nhận field ngoài contract. |
 
 ## 3. Authentication và authorization
 
-### Request authentication
+### Local request authentication
 
 ```http
-Authorization: Bearer <access-token>
+Authorization: Bearer dev-hung-001
 ```
 
-M1 giả định token đã được identity provider hoặc SFA gateway phát hành và validated. Server lấy tối thiểu `sales_rep_id` từ claim/context. Client **không gửi** `sales_rep_id` trong `POST /orders`.
+Backend local map token sang `sales_rep_id = HUNG-001`. Client **không gửi** `sales_rep_id` trong `POST /orders`.
+
+### Production replacement
+
+Production sẽ dùng token do identity provider hoặc SFA gateway phát hành/validate. Server lấy tối thiểu `sales_rep_id` từ claim/context; request/response body và ownership rule không đổi khi thay adapter.
 
 ### Authorization rule
 
@@ -104,7 +110,7 @@ Mã lỗi chính:
 | Cùng `client_order_id` và payload khác | `409 CLIENT_ORDER_ID_CONFLICT`. |
 | Client cần trạng thái mới nhất | Gọi `GET /api/v1/orders/{order_id}`. |
 
-Thời gian giữ idempotency key là decision open; đề xuất tối thiểu 24 giờ để hỗ trợ SFA offline/retry.
+Idempotency key được giữ **24 giờ** trong local baseline và được điều khiển bằng `IDEMPOTENCY_TTL_HOURS`. Production phải xác nhận retention theo offline retry behavior của SFA trước khi thay đổi giá trị này.
 
 ## 6. Endpoint: tạo order
 

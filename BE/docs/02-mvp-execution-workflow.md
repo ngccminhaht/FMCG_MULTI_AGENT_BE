@@ -86,14 +86,15 @@ Out of scope không có nghĩa “không bao giờ làm”; nghĩa là không đ
 
 **User value:** Hùng tạo được một đơn hợp lệ cho Tạp hóa cô Lan, hệ thống không làm mất hoặc tạo trùng đơn.
 
-**Public interface dự kiến:**
+**Public interface baseline cho local M1:**
 
 ```text
-GET  /api/v1/retailers            (hoặc retailer được truyền từ SFA context)
-GET  /api/v1/products
 POST /api/v1/orders
+GET  /api/v1/orders
 GET  /api/v1/orders/{order_id}
 ```
+
+Retailer, product và sales-retailer assignment dùng PostgreSQL seed data trong local MVP. `GET /retailers` và `GET /products` sẽ được bổ sung sau khi FE thật được chọn hoặc khi SFA/ERP master-data integration được chốt.
 
 **Internal interface dự kiến:**
 
@@ -235,15 +236,15 @@ Theo thứ tự ưu tiên:
 6. Review/baseline contract.
 7. Update FastAPI prototype theo contract, đồng thời dựng PostgreSQL + SQLAlchemy/Alembic và FE base.
 
-## 7. Lưu ý về source hiện tại
+## 7. Trạng thái implementation M1 hiện tại
 
-Code hiện tại giúp demo ý tưởng `POST /api/v1/orders`, nhưng chưa đáp ứng M1 vì:
+Backend local M1 hiện đã có persistence, migration, local auth adapter, idempotency, database outbox, fraud worker, audit và các endpoint create/list/detail đúng baseline contract. Xem [runbook local](08-m1-local-development-and-runbook.md) để chạy và xác nhận flow thực tế.
 
-- kết quả fraud được trả đồng bộ và luôn `APPROVED`;
-- không có database hay migration;
-- không có auth/authorization;
-- không có idempotency;
-- không có `GET /orders/{id}`;
-- không có queue/worker/audit/test suite.
+Các điểm còn thiếu so với Definition of Done end-to-end:
 
-Không cần xóa base hiện tại. Sau khi contract baseline, thay dần các implementation mock bằng module thật trong cùng kiến trúc hoặc kiến trúc đã được review.
+- Live PostgreSQL migration/API/worker verification đã pass: Docker PostgreSQL healthy, migration/seed, create/retry/conflict/error/read flow, durable outbox/audit và concurrent idempotency/client-order/reordered-items replay.
+- React Native/Expo client M1 tại `../FE` đã theo OpenAPI: create order, persisted retry/idempotency, list/detail, polling, error/config UI; typecheck và Android static export đã pass. E2E với emulator/physical device vẫn chờ Android SDK Platform Tools (`adb`) và thiết bị/emulator.
+- Worker fraud vẫn là deterministic mock rule, chưa phải AI/ML production.
+- Production JWT/SFA integration, master-data source, observability, CI/regression suite và release controls chưa thuộc local M1.
+
+Không cần quay lại prototype in-memory. Các thay đổi tiếp theo phải tiếp tục đi qua contract, migration impact và UAT/release gate đã baseline.
