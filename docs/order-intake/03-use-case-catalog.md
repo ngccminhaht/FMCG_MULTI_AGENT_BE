@@ -125,9 +125,9 @@ Forecast chỉ nên vào implementation khi order/master data ổn định, data
 |---|---|---|
 | Identity lấy từ đâu? | `sales_rep_id` có lấy từ JWT hay client body, authorization thực hiện thế nào | Product/Security/Integration |
 | SFA là source of truth nào? | retailer, product, price, assignment và sync strategy | Business/Integration |
-| Idempotency format | xác định header hay `client_order_id`, response khi retry | FE/BE |
-| Fraud sync hay async | quyết định `200`/`202`, trạng thái, polling/webhook | Product/BE/Data/AI |
-| Target order state machine | quyết định allowed transitions/UI/worker behavior | Business/BE |
+| Idempotency format | xác định header hay `client_order_id`, response khi retry | mobile app/order-intake service |
+| Fraud sync hay async | quyết định `200`/`202`, trạng thái, polling/webhook | Product/order-intake/Data/AI |
+| Target order state machine | quyết định allowed transitions/UI/worker behavior | Business/order-intake |
 | Promotion scope MVP | xác định API/quote rule và fields cần gửi | Business/Operations |
 | Review owner/SLA | xác định `REVIEW_REQUIRED`, queue, permission và alerts | Operations |
 | Data privacy/audit | GPS/device/PII có được phép thu thập/lưu bao lâu không | Business/Security/Legal |
@@ -137,5 +137,5 @@ Forecast chỉ nên vào implementation khi order/master data ổn định, data
 1. Review từng P0 use case cùng business và technical team.
 2. Mỗi use case được accepted phải có business rule, acceptance criteria và owner.
 3. Chỉ chọn một nhóm P0 đủ nhỏ cho M1; tránh làm hết bảng cùng lúc.
-4. Map nhóm M1 thành API/event cụ thể trong `api-contract.md` và `openapi.yaml`.
+4. Map nhóm M1 thành API/event cụ thể trong `api-contract.md` và `order-intake.v1.yaml`.
 5. Khi một use case bị thay đổi, cập nhật tài liệu này trước hoặc cùng lúc với contract để giữ traceability.

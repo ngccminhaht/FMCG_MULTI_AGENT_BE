@@ -188,10 +188,10 @@ Các quyết định trong [06-m1-local-baseline.md](06-m1-local-baseline.md) đ
 | ID | Quyết định/giả định | Trạng thái | Owner cần chốt | Tác động nếu đổi |
 |---|---|---|---|---|
 | D-M1-001 | M1 chỉ bao gồm create + read order; master data API có thể mock/adapter. | PROPOSED | Product/Tech lead | Số endpoint và data dependency. |
-| D-M1-002 | Identity đến từ Bearer JWT/SFA gateway; sales ID do server suy ra. | OPEN | Security/Integration | Request schema, auth middleware, FE token flow. |
-| D-M1-003 | Fraud xử lý async; `POST /orders` trả `202`. | PROPOSED | Product/BE/Data | State model, UI polling, worker/queue. |
+| D-M1-002 | Identity đến từ Bearer JWT/SFA gateway; sales ID do server suy ra. | OPEN | Security/Integration | Request schema, auth middleware, mobile token flow. |
+| D-M1-003 | Fraud xử lý async; `POST /orders` trả `202`. | PROPOSED | Product/order-intake/Data | State model, UI polling, worker/queue. |
 | D-M1-004 | Worker failure sau retry chuyển `REVIEW_REQUIRED`, không auto-approve. | PROPOSED | Operations/Product | SLA, review queue và support process. |
-| D-M1-005 | Idempotency dùng mandatory UUID header + client order ID. | PROPOSED | FE/BE/SFA | Offline retry and reconciliation behavior. |
+| D-M1-005 | Idempotency dùng mandatory UUID header + client order ID. | PROPOSED | mobile app/order-intake service/SFA | Offline retry and reconciliation behavior. |
 | D-M1-006 | Monetary amount dùng integer VND `declared_total_amount_vnd`. | PROPOSED | Business/Finance | Backward compatibility với SFA payload hiện có. |
 | D-M1-007 | Pricing/promotion authoritative calculation không thuộc M1. | PROPOSED | Business/Operations | Mức validation và fraud input. |
 | D-M1-008 | GPS/device metadata không gửi trong M1 trước privacy/legal review. | OPEN | Security/Legal/Product | Fraud signal design và PII retention. |

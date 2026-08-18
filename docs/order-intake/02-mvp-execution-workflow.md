@@ -15,12 +15,12 @@ B. Chốt MVP scope và use case P0
 C. Chốt business rule, trạng thái và dữ liệu tối thiểu
 D. Baseline API/event contract của slice đầu tiên
 E. Dựng/hoàn thiện technical foundation còn thiếu
-F. FE + BE + database + worker implement cùng một vertical slice
+F. mobile app + service + database + worker implement cùng một vertical slice
 G. Test, demo/UAT, release
 H. Đo kết quả rồi chọn slice tiếp theo
 ```
 
-Không làm theo kiểu “xong toàn bộ BE, rồi làm FE, rồi mới test”. Không làm theo kiểu “đủ toàn bộ feature fraud và forecasting rồi mới release”.
+Không làm theo kiểu “xong toàn bộ service, rồi làm mobile app, rồi mới test”. Không làm theo kiểu “đủ toàn bộ feature fraud và forecasting rồi mới release”.
 
 ## 2. MVP được đề xuất
 
@@ -76,7 +76,7 @@ Out of scope không có nghĩa “không bao giờ làm”; nghĩa là không đ
 | Actor/use case | `03-use-case-catalog.md` được review cho P0 |
 | Rule + state | tài liệu state machine và rule order/fraud tối thiểu |
 | Data | logical/physical ERD chỉ cho P0 |
-| Contract | `api-contract.md`, `openapi.yaml` cho P0 |
+| Contract | `api-contract.md`, `order-intake.v1.yaml` cho P0 |
 | Quality | acceptance criteria, error format và test scenario |
 | Decision log | các quyết định/giả định còn mở có owner và deadline |
 
@@ -94,7 +94,7 @@ GET  /api/v1/orders
 GET  /api/v1/orders/{order_id}
 ```
 
-Retailer, product và sales-retailer assignment dùng PostgreSQL seed data trong local MVP. `GET /retailers` và `GET /products` sẽ được bổ sung sau khi FE thật được chọn hoặc khi SFA/ERP master-data integration được chốt.
+Retailer, product và sales-retailer assignment dùng PostgreSQL seed data trong local MVP. `GET /retailers` và `GET /products` sẽ được bổ sung sau khi mobile app thật được chọn hoặc khi SFA/ERP master-data integration được chốt.
 
 **Internal interface dự kiến:**
 
@@ -154,7 +154,7 @@ Scope dự kiến:
 
 ## 4. Cách làm một vertical slice
 
-Mỗi slice đi theo cùng một flow để FE, BE, QA không lệch nhau:
+Mỗi slice đi theo cùng một flow để mobile app, service, QA không lệch nhau:
 
 ```text
 1. Story + acceptance criteria
@@ -162,7 +162,7 @@ Mỗi slice đi theo cùng một flow để FE, BE, QA không lệch nhau:
 3. Data impact + migration plan
 4. Contract draft + example payload
 5. Review/baseline contract
-6. FE mock + BE implementation + tests song song
+6. mobile app mock + service implementation + tests song song
 7. Integration/contract test
 8. Demo/UAT
 9. Release + observability
@@ -195,7 +195,7 @@ Một story/slice chỉ vào implementation khi có đủ:
 | Data/AI | định nghĩa input signal, reason code, mock/rule contract, đánh giá data quality |
 | Platform | local stack, CI, environment/secrets, deploy/log/alert minimum |
 
-FE có thể dùng mock server/data đúng OpenAPI; BE không cần chờ FE để implement. Hai bên gặp nhau ở contract test, không ở việc đọc source code của nhau.
+mobile app có thể dùng mock server/data đúng OpenAPI; service không cần chờ mobile app để implement. Hai bên gặp nhau ở contract test, không ở việc đọc source code của nhau.
 
 ### 4.3 Definition of Done (DoD)
 
@@ -211,14 +211,14 @@ Một slice chỉ được đánh dấu done khi:
 - Documentation/changelog cập nhật.
 - Known limitations được ghi rõ; không trình bày mock như AI production.
 
-## 5. Chính sách thay đổi trong khi FE/BE đang làm
+## 5. Chính sách thay đổi trong khi mobile app/order-intake service đang làm
 
 Contract sẽ luôn thay đổi; mục tiêu là kiểm soát blast radius, không phải ngăn thay đổi.
 
 1. Mở issue/change request: thay đổi lý do gì, ảnh hưởng actor/use case nào.
 2. Phân loại compatible hay breaking.
-3. Cập nhật `api-contract.md`, `openapi.yaml`, examples và test case trong một change.
-4. FE, BE, QA review impact trước merge.
+3. Cập nhật `api-contract.md`, `order-intake.v1.yaml`, examples và test case trong một change.
+4. mobile app, service, QA review impact trước merge.
 5. Compatible change: có thể thêm field optional/response field, vẫn thông báo release note.
 6. Breaking change: có transition plan; nếu client đã release thì giữ compatibility hoặc version public API khi cần.
 
@@ -232,9 +232,9 @@ Theo thứ tự ưu tiên:
 2. Chọn chính xác **M1** là vertical slice đầu tiên; không thêm forecast vào M1.
 3. Viết rule và target state machine cho order/fraud.
 4. Chốt các decision blocker: auth source, idempotency, pricing/promotion source, async processing, review owner, data retention.
-5. Viết `05-api-contract.md` và `openapi.yaml` chỉ cho M1.
+5. Viết `05-api-contract.md` và `order-intake.v1.yaml` chỉ cho M1.
 6. Review/baseline contract.
-7. Update FastAPI prototype theo contract, đồng thời dựng PostgreSQL + SQLAlchemy/Alembic và FE base.
+7. Update FastAPI prototype theo contract, đồng thời dựng PostgreSQL + SQLAlchemy/Alembic và mobile app base.
 
 ## 7. Trạng thái implementation M1 hiện tại
 
@@ -243,7 +243,7 @@ Backend local M1 hiện đã có persistence, migration, local auth adapter, ide
 Các điểm còn thiếu so với Definition of Done end-to-end:
 
 - Live PostgreSQL migration/API/worker verification đã pass: Docker PostgreSQL healthy, migration/seed, create/retry/conflict/error/read flow, durable outbox/audit và concurrent idempotency/client-order/reordered-items replay.
-- React Native/Expo client M1 tại `../FE` đã theo OpenAPI: create order, persisted retry/idempotency, list/detail, polling, error/config UI; typecheck và Android static export đã pass. E2E với emulator/physical device vẫn chờ Android SDK Platform Tools (`adb`) và thiết bị/emulator.
+- React Native/Expo mobile app M1 tại `../../apps/mobile` đã theo OpenAPI: create order, persisted retry/idempotency, list/detail, polling, error/config UI; typecheck và Android static export đã pass. E2E với emulator/physical device vẫn chờ Android SDK Platform Tools (`adb`) và thiết bị/emulator.
 - Worker fraud vẫn là deterministic mock rule, chưa phải AI/ML production.
 - Production JWT/SFA integration, master-data source, observability, CI/regression suite và release controls chưa thuộc local M1.
 

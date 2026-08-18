@@ -1,7 +1,7 @@
 # M1 — API Contract: Order Intake and Risk Validation
 
 **Trạng thái:** Baseline `0.1.0` cho local MVP; production integration cần review riêng
-**OpenAPI tương ứng:** [`openapi.yaml`](openapi.yaml)
+**OpenAPI tương ứng:** [`order-intake.v1.yaml`](../../contracts/openapi/order-intake.v1.yaml)
 **Rule/state source:** [`04-domain-rules-and-state-machine.md`](04-domain-rules-and-state-machine.md)
 **Local implementation profile:** [`06-m1-local-baseline.md`](06-m1-local-baseline.md)
 
@@ -80,7 +80,7 @@ Mọi lỗi application-level dùng một envelope thống nhất:
 }
 ```
 
-Schema chính thức trong `openapi.yaml` là nguồn chuẩn; implementation phải trả JSON hợp lệ với `request_id` là string.
+Schema chính thức trong [`order-intake.v1.yaml`](../../contracts/openapi/order-intake.v1.yaml) là nguồn chuẩn; implementation phải trả JSON hợp lệ với `request_id` là string.
 
 Mã lỗi chính:
 
@@ -306,4 +306,4 @@ Không gọi contract này là **Approved** cho tới khi các item sau được
 6. Permission, SLA và UX copy cho `REVIEW_REQUIRED`.
 7. Data privacy/retention trước khi thêm GPS/device data.
 
-Sau baseline, `openapi.yaml` là nguồn machine-readable để FE generate/mock client, BE viết contract test và QA sinh test matrix.
+Sau baseline, [`order-intake.v1.yaml`](../../contracts/openapi/order-intake.v1.yaml) là nguồn machine-readable để mobile app generate/mock client, service viết contract test và QA sinh test matrix.

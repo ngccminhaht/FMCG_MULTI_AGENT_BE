@@ -9,7 +9,7 @@ Chuỗi sau là đúng nhưng **chưa phải toàn bộ quy trình**:
 
 ```text
 Scope → Actor/Use case → Business rule/trạng thái → API mapping
-→ API contract → OpenAPI → Review → FE/BE implement
+→ API contract → OpenAPI → Review → mobile app/order-intake service implement
 ```
 
 Đây là phần trung tâm của **thiết kế và triển khai một feature/vertical slice**. Một dự án hoàn chỉnh cần thêm bước xác minh vấn đề, ưu tiên MVP, yêu cầu phi chức năng, data/integration design, kiểm thử, release, quan sát vận hành và phản hồi sau release.
@@ -115,7 +115,7 @@ Ví dụ, tạo đơn là public API cho App SFA; đánh giá fraud có thể l�
 **Tài liệu cần có:**
 
 1. `api-contract.md`: mô tả dễ đọc gồm mục đích API, actor, rule, request/response, status code, error, auth, ví dụ và quyết định còn mở.
-2. `openapi.yaml`: đặc tả máy đọc được của REST API public.
+2. `order-intake.v1.yaml`: đặc tả máy đọc được của REST API public.
 3. Event contract nếu có queue/event bus: event name, producer, consumer, payload, version và retry/dead-letter behavior.
 
 **Contract phải chốt tối thiểu:**
@@ -129,7 +129,7 @@ Ví dụ, tạo đơn là public API cho App SFA; đánh giá fraud có thể l�
 - Đồng bộ hay bất đồng bộ; trạng thái trả về khi worker/AI chưa hoàn thành.
 - Compatibility policy khi contract thay đổi.
 
-**Exit criteria:** contract của vertical slice đạt trạng thái Baseline/Approved; FE, BE và QA hiểu giống nhau các case quan trọng.
+**Exit criteria:** contract của vertical slice đạt trạng thái Baseline/Approved; mobile app, service và QA hiểu giống nhau các case quan trọng.
 
 ### 4. Dựng technical foundation
 
@@ -227,7 +227,7 @@ Kết quả có thể quay lại phase 0, 1 hoặc 2; đó là hành vi bình th
 
 ### Trước baseline
 
-Trong giai đoạn Draft (`0.x`), contract được phép thay đổi thường xuyên. Tuy vậy phải cập nhật cả `api-contract.md`, `openapi.yaml`, ví dụ mẫu và ticket liên quan cùng lúc để tránh hiểu sai.
+Trong giai đoạn Draft (`0.x`), contract được phép thay đổi thường xuyên. Tuy vậy phải cập nhật cả `api-contract.md`, `order-intake.v1.yaml`, ví dụ mẫu và ticket liên quan cùng lúc để tránh hiểu sai.
 
 ### Sau baseline của một slice/sprint
 
@@ -235,7 +235,7 @@ Trong giai đoạn Draft (`0.x`), contract được phép thay đổi thường 
 - Thay đổi phá vỡ tương thích: xóa/đổi tên field, đổi type, optional thành required, đổi nghĩa status. Phải có change proposal, impact analysis, migration/rollout plan; cân nhắc `/api/v2` nếu API đã được client sử dụng ổn định.
 - Không tạo `/api/v0.2` theo version tài liệu. `info.version` trong OpenAPI và `/api/v1` là hai khái niệm khác nhau.
 
-Base FE/BE không phải làm lại mỗi lần contract thay đổi. Chỉ feature module, adapter/DTO, mapper, test và phần UI liên quan thay đổi; nền tảng như config, logging, database session, HTTP client hoặc CI nên ổn định.
+Base mobile app/order-intake service không phải làm lại mỗi lần contract thay đổi. Chỉ feature module, adapter/DTO, mapper, test và phần UI liên quan thay đổi; nền tảng như config, logging, database session, HTTP client hoặc CI nên ổn định.
 
 ---
 
@@ -244,16 +244,16 @@ Base FE/BE không phải làm lại mỗi lần contract thay đổi. Chỉ feat
 | Mốc | Câu hỏi cần trả lời | Người nên review |
 |---|---|---|
 | MVP scope | Có giải quyết một vấn đề đủ giá trị và đủ nhỏ không? | Business/Product, Tech lead |
-| Domain baseline | Rule, trạng thái, quyền và data ownership đã rõ chưa? | Business, BE, Data/AI |
-| Contract baseline | FE, BE, QA hiểu cùng request/response/failure behavior chưa? | FE, BE, QA |
+| Domain baseline | Rule, trạng thái, quyền và data ownership đã rõ chưa? | Business, service, Data/AI |
+| Contract baseline | mobile app, service, QA hiểu cùng request/response/failure behavior chưa? | mobile app, service, QA |
 | Ready for implementation | Có acceptance criteria, data impact và test scenario chưa? | Feature team |
-| Ready for release | Có migration, observability, rollback, UAT và known limitation chưa? | Product, QA, DevOps/BE |
+| Ready for release | Có migration, observability, rollback, UAT và known limitation chưa? | Product, QA, DevOps/service |
 
 ## Cách áp dụng ngay cho dự án này
 
 1. Không mở rộng ngay code prototype thành tất cả module của hệ thống.
 2. Chốt danh mục actor/use case và chọn **một** MVP vertical slice.
 3. Chốt rule và target state machine của order.
-4. Viết `api-contract.md` và `openapi.yaml` chỉ cho slice đó.
+4. Viết `api-contract.md` và `order-intake.v1.yaml` chỉ cho slice đó.
 5. Baseline contract, sau đó mới thay prototype RAM/mock bằng persistence, idempotency, API tra cứu và worker phù hợp.
 6. Khi slice đầu tiên hoàn thành, dùng dữ liệu/feedback để chọn slice tiếp theo — không mở cùng lúc fraud production, promotion engine và forecasting.

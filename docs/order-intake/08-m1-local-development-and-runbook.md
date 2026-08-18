@@ -1,7 +1,7 @@
 # M1 — Local Development Runbook and Release Checklist
 
-**Trạng thái:** Baseline vận hành cho local/demo M1
-**Phạm vi:** Backend Order Intake and Risk Validation cùng React Native/Expo client local. Không phải runbook production.
+**Trạng thái:** Baseline vận hành cho local/demo M1  
+**Phạm vi:** Order-intake service cùng browser web app và React Native/Expo mobile app local. Không phải runbook production.
 
 ## 1. Mục đích và giới hạn
 
@@ -19,7 +19,7 @@ Các giới hạn phải hiển thị rõ trong mọi demo:
 - Token `dev-hung-001`, seed master data và fraud rule là **local demo only**.
 - Fraud evaluator là deterministic mock/rule engine, không phải AI/ML production.
 - Database mục tiêu là PostgreSQL. SQLite chỉ được dùng cho smoke test tạm thời trong quá trình phát triển, không thay thế PostgreSQL.
-- React Native/Expo client local nằm tại `../FE`; Swagger, curl hoặc PowerShell vẫn hữu ích để xác nhận backend độc lập. Client này không phải frontend production.
+- Browser web app nằm tại [`../../apps/web`](../../apps/web) và React Native/Expo mobile app nằm tại [`../../apps/mobile`](../../apps/mobile); Swagger, curl hoặc PowerShell vẫn hữu ích để xác nhận order-intake service độc lập. Các client này không phải frontend production.
 
 ## 2. Điều kiện trước khi chạy
 
@@ -28,15 +28,16 @@ Các giới hạn phải hiển thị rõ trong mọi demo:
 - Docker Desktop đang chạy và Docker daemon truy cập được.
 - Port `5432` chưa bị PostgreSQL khác chiếm; API mặc định dùng port `8000`.
 
-Cài dependencies trong `BE/`:
+Từ root repository, vào service và cài Python dependencies:
 
 ```powershell
+Set-Location services/order-intake
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install --requirement requirements.txt
 ```
 
-`.env.example` là danh sách giá trị local. Backend đọc biến môi trường của process; không tự nạp file `.env`. Giá trị mặc định trong code đã khớp profile local. Nếu cần override trong PowerShell hiện tại, đặt biến trước khi chạy lệnh, ví dụ:
+`.env.example` là danh sách giá trị local. Service đọc biến môi trường của process; không tự nạp file `.env`. Giá trị mặc định trong code đã khớp profile local. Nếu cần override trong PowerShell hiện tại, đặt biến trước khi chạy lệnh, ví dụ:
 
 ```powershell
 $env:DATABASE_URL = "postgresql+psycopg://fmcg:fmcg@localhost:5432/fmcg_mvp"
@@ -47,20 +48,22 @@ $env:DEV_SALES_TOKEN = "dev-hung-001"
 
 ### 3.1 Khởi động PostgreSQL
 
-Từ thư mục `BE/`, sau khi Docker Desktop đã sẵn sàng:
+Từ thư mục `services/order-intake/`, sau khi Docker Desktop đã sẵn sàng:
 
 ```powershell
-docker compose up -d
-docker compose ps
+docker compose -f ../../infra/compose/postgres.local.yaml up -d
+docker compose -f ../../infra/compose/postgres.local.yaml ps
 ```
 
 Chỉ tiếp tục khi service `postgres` healthy/running. Nếu cần xem nguyên nhân chưa healthy:
 
 ```powershell
-docker compose logs postgres
+docker compose -f ../../infra/compose/postgres.local.yaml logs postgres
 ```
 
 ### 3.2 Áp migration và seed dữ liệu
+
+Từ `services/order-intake/`:
 
 ```powershell
 alembic -c alembic.ini upgrade head
@@ -78,7 +81,7 @@ Seed idempotent, tạo profile local sau:
 
 ### 3.3 Chạy API và worker
 
-Mở hai PowerShell terminal riêng trong `BE/`.
+Mở hai PowerShell terminal riêng trong `services/order-intake/`.
 
 **Terminal API — Android emulator / máy local** (lệnh dài hạn, chạy thủ công):
 
@@ -108,14 +111,15 @@ Kiểm tra API và Swagger:
 Health:  http://127.0.0.1:8000/health
 Swagger: http://127.0.0.1:8000/docs
 Runtime OpenAPI: http://127.0.0.1:8000/openapi.json
-Static contract: docs/openapi.yaml
+Static contract: ../../contracts/openapi/order-intake.v1.yaml
 ```
 
-### 3.4 Chạy React Native/Expo M1 client
+### 3.4 Chạy React Native/Expo M1 mobile app
 
-Trong một PowerShell khác, từ thư mục `FE/`, tạo cấu hình local từ template nếu chưa có `.env`:
+Trong một PowerShell khác, từ root repository, tạo cấu hình local từ template nếu chưa có `.env`:
 
 ```powershell
+Set-Location apps/mobile
 Copy-Item .env.example .env
 ```
 
@@ -136,7 +140,7 @@ npm run android
 
 ## 4. Happy-path demo bằng PowerShell
 
-Tạo một order mức rủi ro thấp. Token local và retailer/SKU phải đúng profile seed:
+Tạo một order mức rủi ro thấp. Token local và retailer/SKU phải đúng profile seed. Các lệnh worker trong phần này được chạy từ `services/order-intake/`.
 
 ```powershell
 $baseUrl = "http://127.0.0.1:8000/api/v1"
@@ -211,16 +215,16 @@ Các validation sau đã chạy trên source hiện tại:
 
 | Check | Kết quả |
 |---|---|
-| `python -m compileall -q app alembic` | Pass |
-| Parse `docs/openapi.yaml` | Pass |
+| `python -m compileall -q app alembic` trong `services/order-intake/` | Pass |
+| Parse `contracts/openapi/order-intake.v1.yaml` | Pass |
 | FastAPI/SQLite temporary smoke | Pass: create, idempotency, worker 3 outcome, audit, list/detail, error contract, Swagger schema, simulated 503 |
-| `alembic -c alembic.ini upgrade head --sql` | Pass: PostgreSQL DDL generation |
-| `alembic -c alembic.ini heads` | Pass: `0001_m1_order_intake` là head |
-| `docker compose config` | Pass |
-| `npm run typecheck` trong `FE/` | Pass |
-| `npx expo export --platform android --output-dir dist` trong `FE/` | Pass |
+| `alembic -c alembic.ini upgrade head --sql` trong `services/order-intake/` | Pass: PostgreSQL DDL generation |
+| `alembic -c alembic.ini heads` trong `services/order-intake/` | Pass: `0001_m1_order_intake` là head |
+| `docker compose -f infra/compose/postgres.local.yaml config` từ root repository | Pass |
+| `npm run typecheck` trong `apps/mobile/` | Pass |
+| `npx expo export --platform android --output-dir dist` trong `apps/mobile/` | Pass |
 | PostgreSQL container migration + HTTP/worker smoke thực tế | Pass: Docker PostgreSQL healthy, Alembic migration/seed, 202 create, 401/403/404/409/422 envelope, idempotency replay/conflict, list/detail, three fraud outcomes, audit/outbox `PUBLISHED`, concurrent retries và reordered-items replay |
-| React Native emulator/physical-device E2E | Chưa chạy: Android SDK Platform Tools (`adb`) và thiết bị/emulator chưa có; backend PostgreSQL live hiện đã sẵn sàng |
+| React Native emulator/physical-device E2E | Chưa chạy: Android SDK Platform Tools (`adb`) và thiết bị/emulator chưa có; order-intake service PostgreSQL live hiện đã sẵn sàng |
 
 Live PostgreSQL integration đã hoàn tất. Không coi Android static export là bằng chứng thay thế device E2E; khi có `adb` và emulator/physical device, chạy UAT-13 và UAT-14 theo section 6.
 
@@ -231,7 +235,7 @@ Live PostgreSQL integration đã hoàn tất. Không coi Android static export l
 - Docker PostgreSQL healthy, migration và seed đã chạy.
 - UAT-01 đến UAT-12 đạt; UAT-13 và UAT-14 cần đạt hoặc có exception được owner chấp thuận trước demo trên device.
 - API/worker dùng local token và seed data được giới hạn trong môi trường demo.
-- `docs/openapi.yaml` và `/openapi.json` được review sau cùng với implementation.
+- [`contracts/openapi/order-intake.v1.yaml`](../../contracts/openapi/order-intake.v1.yaml) và `/openapi.json` được review sau cùng với implementation.
 
 ### Không được gọi là production-ready khi còn bất kỳ điểm nào sau đây
 
@@ -239,12 +243,66 @@ Live PostgreSQL integration đã hoàn tất. Không coi Android static export l
 - Chưa chốt master-data integration, pricing/inventory authority và retention/PII policy.
 - Fraud rule còn là mock; chưa có governance, monitoring false positive/negative hay supervisor review M2.
 - Chưa có worker deployment/scaling, DLQ, metrics, alerting, backup/restore, CI và automated regression suite.
-- Chưa chạy React Native E2E UAT từ emulator/physical device; client hiện được xác nhận bằng typecheck và Android static export, còn backend đã có PostgreSQL live UAT.
+- Chưa chạy React Native E2E UAT từ emulator/physical device; client hiện được xác nhận bằng typecheck và Android static export, còn order-intake service đã có PostgreSQL live UAT.
 
 ## 9. An toàn dữ liệu local và troubleshooting
 
 - Không đưa credentials production, PII, GPS hoặc device metadata vào profile demo.
 - Không chạy `docker compose down -v` trong thao tác bình thường: cờ `-v` xoá PostgreSQL volume và toàn bộ dữ liệu local.
 - `alembic downgrade base` chỉ dùng trên database local rỗng/đã backup; nó drop schema M1.
-- Nếu Docker báo lỗi kết nối `npipe:////./pipe/dockerDesktopLinuxEngine`, hãy khởi động Docker Desktop, chờ engine sẵn sàng rồi chạy lại `docker compose up -d`. Không cần đổi migration hoặc đổi PostgreSQL sang SQLite để né lỗi này.
+- Nếu Docker báo lỗi kết nối `npipe:////./pipe/dockerDesktopLinuxEngine`, hãy khởi động Docker Desktop, chờ engine sẵn sàng rồi chạy lại `docker compose -f ../../infra/compose/postgres.local.yaml up -d`. Không cần đổi migration hoặc đổi PostgreSQL sang SQLite để né lỗi này.
 - Nếu port bị chiếm, xác định process hoặc override port/database URL có chủ đích; không xoá volume để xử lý lỗi port.
+## 10. Browser web client
+
+### 10.1 Chạy local
+
+Sau khi API và worker đã chạy theo section 3.3, mở một PowerShell khác từ root repository:
+
+```powershell
+Set-Location apps/web
+Copy-Item .env.example .env
+npm install
+npm run dev
+```
+
+`npm run dev` là Vite dev server dài hạn; chạy thủ công trong terminal của developer. Mở `http://localhost:5173/orders` trong browser. Route `/orders`, `/orders/new` và `/orders/{order_id}` là browser routes; production static host phải cấu hình SPA fallback về `index.html`.
+
+Cấu hình local mặc định trong `.env`:
+
+```dotenv
+VITE_API_BASE_URL=
+VITE_LOCAL_SALES_TOKEN=dev-hung-001
+API_PROXY_TARGET=http://127.0.0.1:8000
+```
+
+Khi `VITE_API_BASE_URL` để trống, browser gọi same-origin `/api` và Vite proxy request sang `API_PROXY_TARGET`; cách này cho phép các header `Authorization` và `Idempotency-Key` hoạt động trong local mà không cần CORS trong service. Restart Vite sau khi đổi `.env`.
+
+Không đặt production bearer token vào biến `VITE_*`: các giá trị này được bundle vào JavaScript browser. Nếu dùng `VITE_API_BASE_URL=http://localhost:8000` để gọi API trực tiếp, browser sẽ cần CORS; Order Intake service hiện chưa có CORS allowlist. Deployment phải dùng reverse proxy cùng origin hoặc thêm CORS allowlist review riêng, gồm origin, methods, request headers và exposed response headers cần thiết.
+
+### 10.2 Hành vi web client M1
+
+- Form tạo order dùng seed retailer `CO-LAN-001` và hai SKU local; không dùng dữ liệu này cho production.
+- Trước `POST`, web app lưu exact request body, UUID `Idempotency-Key` và thời điểm tạo vào `localStorage`. Retry luôn tái sử dụng cùng body/key.
+- `202 Accepted` chỉ nghĩa là order đã được nhận và đang chờ fraud worker; trang chi tiết poll với backoff 3, 6, 12, 24 rồi tối đa 30 giây, và dừng ở final/terminal error/rời trang.
+- Retry queue chạy tuần tự khi người dùng bấm **Retry queue**. Error mạng, timeout, `5xx`, `408` và `429` giữ request; `401` giữ request nhưng chặn retry; các `4xx` khác yêu cầu sửa request và được xử lý như terminal failure.
+- Queue có serialization trong tab và dùng Web Locks khi browser hỗ trợ; trước production vẫn cần chốt chính sách multi-tab, browser session/token storage và persistence/retention.
+
+### 10.3 Kiểm tra trước demo web
+
+Từ `apps/web/`:
+
+```powershell
+npm run typecheck
+npm run build
+npm audit
+```
+
+Manual UAT browser cần xác nhận các case sau trên PostgreSQL local:
+
+| ID | Action | Expected result |
+|---|---|---|
+| WEB-UAT-01 | Tạo valid order trên browser, chạy worker, mở lại detail | Nhận đúng `202`, trạng thái đi từ `PENDING_FRAUD_CHECK` sang final state, list/detail khớp API. |
+| WEB-UAT-02 | Ngắt API hoặc làm request timeout khi submit, reload browser rồi bấm retry | `localStorage` giữ nguyên body và `Idempotency-Key`; retry tạo/replay đúng một order. |
+| WEB-UAT-03 | Gửi request terminal-invalid và request với token sai | Terminal request yêu cầu sửa data; `401` không làm mất queue entry. |
+| WEB-UAT-04 | Mở trực tiếp `/orders/{order_id}` và dùng Back/Forward | Detail load đúng khi dev server có SPA fallback; navigation không để poll cũ ghi đè state mới. |
+| WEB-UAT-05 | Mở app qua direct cross-origin API URL | Chỉ pass khi backend có CORS allowlist; local profile mặc định dùng Vite proxy thay vì direct CORS. |

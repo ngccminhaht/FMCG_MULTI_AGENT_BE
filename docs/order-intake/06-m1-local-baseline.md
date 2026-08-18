@@ -6,20 +6,21 @@
 
 ## 1. Mục đích
 
-Tài liệu này đóng các decision `OPEN` và `PROPOSED` cần thiết để bắt đầu implement M1 mà không phải chờ SFA, identity provider, AI model hoặc frontend production.
+Tài liệu này đóng các decision `OPEN` và `PROPOSED` cần thiết để bắt đầu implement M1 mà không phải chờ SFA, identity provider, AI model hoặc mobile client production.
 
 Các quy tắc domain/API trong các tài liệu dưới đây vẫn là nguồn chính; baseline này ghi rõ lựa chọn cụ thể được dùng cho local implementation:
 
 - [M1 domain rules và state machine](04-domain-rules-and-state-machine.md)
 - [M1 API Contract](05-api-contract.md)
-- [M1 OpenAPI Draft](openapi.yaml)
+- [M1 OpenAPI Draft](../../contracts/openapi/order-intake.v1.yaml)
 
 ## 2. Scope implementation được baseline
 
 ```text
-Backend + React Native/Expo local MVP
+Order-intake service + browser web app + React Native/Expo mobile app local MVP
 
-React Native/Expo demo client (`../FE`) / Swagger / curl
+Browser web app (`../../apps/web`) / React Native/Expo app (`../../apps/mobile`)
+/ Swagger / curl
   → Bearer dev token
   → PostgreSQL local
   → tạo order idempotent
@@ -28,13 +29,13 @@ React Native/Expo demo client (`../FE`) / Swagger / curl
   → GET list/detail để poll status
 ```
 
-M1 có app React Native/Expo local demo tại `../FE`, tiêu thụ OpenAPI cho create order, persisted retry/idempotency, list/detail và polling. Nó không phải app production: không có identity/SFA thật, master-data endpoint, secure token store hay production release profile. Swagger/curl/PowerShell vẫn là client hỗ trợ để validate backend độc lập.
+M1 có browser web app local tại [`../../apps/web`](../../apps/web) và React Native/Expo mobile app local tại [`../../apps/mobile`](../../apps/mobile). Cả hai client tiêu thụ OpenAPI cho create order, persisted retry/idempotency, list/detail và polling. Browser app dùng Vite same-origin proxy trong local để gọi service mà không cần CORS; khi deploy phải dùng reverse proxy cùng origin hoặc CORS allowlist rõ ràng. Các client này không phải app production: không có identity/SFA thật, master-data endpoint, secure token/session storage hay production release profile. Swagger/curl/PowerShell vẫn là client hỗ trợ để validate order-intake service độc lập.
 
 ## 3. Quyết định đã chốt cho local MVP
 
 | ID | Quyết định baseline | Lý do / implementation boundary |
 |---|---|---|
-| B-M1-001 | Identity local dùng `Authorization: Bearer dev-hung-001`; backend map token này sang `sales_rep_id = HUNG-001`. | Tách ownership khỏi request body ngay từ đầu nhưng không giả vờ đã tích hợp JWT/SFA thật. Production thay bằng adapter identity/JWT. |
+| B-M1-001 | Identity local dùng `Authorization: Bearer dev-hung-001`; service map token này sang `sales_rep_id = HUNG-001`. | Tách ownership khỏi request body ngay từ đầu nhưng không giả vờ đã tích hợp JWT/SFA thật. Production thay bằng adapter identity/JWT. |
 | B-M1-002 | Master data dùng PostgreSQL local seed: `HUNG-001`, retailer `CO-LAN-001`, SKU `SKU-NUOC-NGOT-001` và `SKU-MI-GOI-001`; Hùng chỉ được gán cho cô Lan. | Có thể test authorization và SKU validation thật mà không phụ thuộc SFA/ERP. |
 | B-M1-003 | `POST /orders` bắt buộc `Idempotency-Key` UUID và `client_order_id`; idempotency record được giữ 24 giờ. | Hỗ trợ retry/offline sync tối thiểu. TTL là config để production điều chỉnh. |
 | B-M1-004 | Create order trả `202 Accepted` và trạng thái ban đầu `PENDING_FRAUD_CHECK`. | Giữ contract async ngay cả khi local worker được chạy thủ công. |
@@ -69,19 +70,19 @@ GET  /api/v1/orders
 GET  /api/v1/orders/{order_id}
 ```
 
-Master data không được public thành endpoint M1 trong baseline này. Seed IDs được dùng để test API/backend-first. Khi bắt đầu FE thật, team sẽ quyết định một trong hai hướng:
+Master data không được public thành endpoint M1 trong baseline này. Seed IDs được dùng để test API/service-first. Khi bắt đầu web/mobile client production, team sẽ quyết định một trong hai hướng:
 
 1. Bổ sung `GET /api/v1/retailers` và `GET /api/v1/products` vào version contract tương thích; hoặc
 2. Tích hợp trực tiếp với API master data của SFA/ERP qua adapter.
 
-Không để FE hard-code master data production.
+Không để web hoặc mobile client hard-code master data production.
 
 ## 6. Definition of baseline completion
 
 M1 local baseline được coi là sẵn sàng vào implementation khi:
 
-- Các file `04`, `05`, `openapi.yaml` vẫn nhất quán với quyết định ở tài liệu này.
-- Backend implementation dùng exact request/response/status trong OpenAPI.
+- Các file `04`, `05`, [`order-intake.v1.yaml`](../../contracts/openapi/order-intake.v1.yaml) vẫn nhất quán với quyết định ở tài liệu này.
+- Service implementation dùng exact request/response/status trong OpenAPI.
 - Không còn `sales_rep_id` do client gửi trong target API.
 - Database, worker và API được validate qua smoke flow:
 
